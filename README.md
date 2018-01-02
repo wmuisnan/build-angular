@@ -30,3 +30,18 @@ In this first part of the book you will implement Angular scopes. We will cover 
 
 `The other side` of the coin is the `$digest` function. It iterates over all the watchers that have been attached on the scope, and runs their watch and listener functions accordingly.（提供一个检查是有有变化的方法）
 
+angularjs 的脏值检测，就是比较一个需要检测的值（watcher的第一参数），前后有无变化。如果有变化，就调用监听函数（watcher的第二参数）。scope 就是实现这个想法，以及各种优化。哪几种？
+
+
+也就是说，scope 的实现，围绕以下展开
+
+1. 如何执行脏值检测
+2. 检测哪些值
+3. 如果有变化，怎么处理
+
+2， 3 是一个watcher。由之产生的问题是watcher的格式(对象)，watcher放在哪（某数组里）
+
+
+We’ve now implemented the essence of Angular scopes: Attaching watches and running them in a digest.（scopes的本质，存储watcher,在遍历中执行他们）
+
+
