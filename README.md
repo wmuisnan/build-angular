@@ -45,3 +45,6 @@ angularjs 的脏值检测，就是比较一个需要检测的值（watcher的第
 We’ve now implemented the essence of Angular scopes: Attaching watches and running them in a digest.（scopes的本质，存储watcher,在遍历中执行他们）
 
 
+`$$digestOnce`angularjs内部没有此方法。
+
+
