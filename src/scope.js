@@ -6,6 +6,7 @@ function initWatchVal() { }
 
 function Scope() {
   this.$$watchers = [];
+  this.$$lastDirtyWatch = null;
 }
 
 Scope.prototype.$watch = function (watchFn, listenerFn) {
@@ -15,6 +16,7 @@ Scope.prototype.$watch = function (watchFn, listenerFn) {
     last: initWatchVal
   };
   this.$$watchers.push(watcher);
+  this.$$lastDirtyWatch = null;
 };
 
 Scope.prototype.$$digestOnce = function () {
@@ -26,8 +28,11 @@ Scope.prototype.$$digestOnce = function () {
 
     if (newValue !== oldValue) {
       watcher.last = newValue;
+      self.$$lastDirtyWatch = watcher;
       watcher.listenerFn(newValue, oldValue === initWatchVal ? newValue : oldValue, self);
       dirty = true;
+    } else if (self.$$lastDirtyWatch === watcher) {
+      return false;
     }
 
   });
@@ -38,6 +43,7 @@ Scope.prototype.$$digestOnce = function () {
 Scope.prototype.$digest = function () {
   var dirty;
   var ttl = 10;
+  this.$$lastDirtyWatch = null;
   do {
     dirty = this.$$digestOnce();
     if (dirty && !(ttl--)) {
