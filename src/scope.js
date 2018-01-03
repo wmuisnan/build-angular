@@ -16,10 +16,21 @@ function Scope() {
   this.$root = this;
 }
 
-Scope.prototype.$new = function () {
-  var ChildScope = function () { };
-  ChildScope.prototype = this;
-  var child = new ChildScope();
+Scope.prototype.$new = function (isolated) {
+  
+  var child;
+  if (isolated) {
+    child = new Scope();
+    child.$root = this.$root;
+    child.$$asyncQueue = this.$$asyncQueue;
+    child.$$postDigestQueue = this.$$postDigestQueue;
+    child.$$applyAsyncQueue = this.$$applyAsyncQueue;
+  } else {
+    var ChildScope = function () { };
+    ChildScope.prototype = this;
+    child = new ChildScope();
+  }
+
   this.$$children.push(child);
   child.$$watchers = [];
   child.$$children = [];
@@ -109,8 +120,8 @@ Scope.prototype.$digest = function () {
     如果放在do/while后，这里对scope的修改，
     就不会触发监听函数了
   */
-  if (this.$$applyAsyncId) {
-    clearTimeout(this.$$applyAsyncId);
+  if (this.$root.$$applyAsyncId) {
+    clearTimeout(this.$root.$$applyAsyncId);
     this.$$flushApplyAsync();
   }
 
@@ -205,7 +216,7 @@ Scope.prototype.$$flushApplyAsync = function () {
       console.error(e);
     }
   }
-  this.$$applyAsyncId = null;
+  this.$root.$$applyAsyncId = null;
 };
 
 
@@ -225,8 +236,8 @@ Scope.prototype.$applyAsync = function (expr) {
     });
   }, 0); 
   */
-  if (self.$$applyAsyncId === null) {
-    self.$$applyAsyncId = setTimeout(function () {
+  if (self.$root.$$applyAsyncId === null) {
+    self.$root.$$applyAsyncId = setTimeout(function () {
       self.$apply(_.bind(self.$$flushApplyAsync, self));
     }, 0);
   }
