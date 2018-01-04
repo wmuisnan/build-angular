@@ -316,7 +316,17 @@ function isArrayLike(obj) {
     return false;
   }
   var length = obj.length;
-  return _.isNumber(length);
+  
+  // 比下面的书中比较的更好， 支持 { length: 0, otherKey: 'abc' }
+  // 这个应该还能优化
+  if (length === 0) {
+    return _.keys(obj).length === length;
+  } else {
+    return (_.isNumber(length) && length > 0 && (length - 1) in obj);
+  }
+
+  /* return length === 0 ||
+  (_.isNumber(length) && length > 0 && (length - 1) in obj); */
 }
 
 
