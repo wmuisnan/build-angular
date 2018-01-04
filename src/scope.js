@@ -450,26 +450,46 @@ Scope.prototype.$on = function (eventName, listener) {
     this.$$listeners[eventName] = listeners = [];
   }
   listeners.push(listener);
+
+  return function () {
+    var index = listeners.indexOf(listener);
+    if (index >= 0) {
+      // listeners.splice(index, 1); // not-skit-part-A
+      listeners[index] = null;
+    }
+  };
 };
 
 
-Scope.prototype.$emit = function(eventName) {
+Scope.prototype.$emit = function (eventName) {
   var additionalArgs = _.tail(arguments);
   return this.$$fireEventOnScope(eventName, additionalArgs);
 };
 
-Scope.prototype.$broadcast = function(eventName) {
+Scope.prototype.$broadcast = function (eventName) {
   var additionalArgs = _.tail(arguments);
   return this.$$fireEventOnScope(eventName, additionalArgs);
 };
 
-Scope.prototype.$$fireEventOnScope = function(eventName, additionalArgs) {
-  var event = {name: eventName};
+Scope.prototype.$$fireEventOnScope = function (eventName, additionalArgs) {
+  var event = { name: eventName };
   var listenerArgs = [event].concat(additionalArgs);
   var listeners = this.$$listeners[eventName] || [];
-  _.forEach(listeners, function(listener) {
+  /* 
+    比下面的循环好些 for test does not skip the next listener when removed on ' + method
+  _.forEachRight(listeners, function (listener) { // not-skit-part-B
     listener.apply(null, listenerArgs);
-  });
+  }); 
+  */
+  var i = 0;
+  while (i < listeners.length) {
+    if (listeners[i] === null) {
+      listeners.splice(i, 1);
+    } else {
+      listeners[i].apply(null, listenerArgs);
+      i++;
+    }
+  }
   return event;
 };
 
