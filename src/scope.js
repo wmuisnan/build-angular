@@ -333,7 +333,7 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
         // step1
         if (!_.isArray(oldValue)) { // oldValue 永远是合法的数组。因为后面两步
           changeCount++;
-          // 为何把旧值设为数组，特性？
+          // 为何把旧值设为数组，特性？ 为后续和下次比较准备。需要往 oldValue 添加内容，设置长度
           oldValue = [];
         }
         
@@ -357,7 +357,10 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
           比如更新长度，数组内容 
         */
       } else {
-      
+        if (!_.isObject(oldValue) || isArrayLike(oldValue)) {
+          changeCount++;
+          oldValue = {};
+        }
       }
     } else {
       if (!self.$$areEqual(newValue, oldValue, false)) {
