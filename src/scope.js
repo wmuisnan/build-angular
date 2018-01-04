@@ -311,6 +311,14 @@ Scope.prototype.$destroy = function () {
   this.$$watchers = null;
 };
 
+function isArrayLike(obj) {
+  if (_.isNull(obj) || _.isUndefined(obj)) {
+    return false;
+  }
+  var length = obj.length;
+  return _.isNumber(length);
+}
+
 
 Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
   var self = this;
@@ -320,10 +328,10 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
   var internalWatchFn = function (scope) {
     newValue = watchFn(scope);
     if (_.isObject(newValue)) {
-      if (_.isArray(newValue)) {
+      if (isArrayLike(newValue)) {
         
         // step1
-        if (!_.isArray(oldValue)) {
+        if (!_.isArray(oldValue)) { // oldValue 永远是合法的数组。因为后面两步
           changeCount++;
           // 为何把旧值设为数组，特性？
           oldValue = [];
