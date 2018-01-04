@@ -14,6 +14,7 @@ function Scope() {
   this.$$postDigestQueue = [];
   this.$$children = [];
   this.$root = this;
+  this.$$listeners = {};
 }
 
 Scope.prototype.$new = function (isolated, parent) {
@@ -35,6 +36,7 @@ Scope.prototype.$new = function (isolated, parent) {
   parent.$$children.push(child);
   child.$$watchers = [];
   child.$$children = [];
+  child.$$listeners = {};
   child.$parent = parent;
   return child;
 };
@@ -316,7 +318,7 @@ function isArrayLike(obj) {
     return false;
   }
   var length = obj.length;
-  
+
   // 比下面的书中比较的更好， 支持 { length: 0, otherKey: 'abc' }
   // 这个应该还能优化
   if (length === 0) {
@@ -405,7 +407,7 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
           changeCount++;
         } 
         */
-        
+
         // 是否被删
         if (oldLength > newLength) {
           changeCount++;
@@ -414,7 +416,7 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
               oldLength--;
               delete oldValue[key];
             }
-          });          
+          });
         }
 
       }
@@ -440,6 +442,14 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
     }
   };
   return this.$watch(internalWatchFn, internalListenerFn);
+};
+
+Scope.prototype.$on = function (eventName, listener) {
+  var listeners = this.$$listeners[eventName];
+  if (!listeners) {
+    this.$$listeners[eventName] = listeners = [];
+  }
+  listeners.push(listener);
 };
 
 module.exports = Scope;
