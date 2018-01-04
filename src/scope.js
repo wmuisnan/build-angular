@@ -361,6 +361,22 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
           changeCount++;
           oldValue = {};
         }
+
+        _.forOwn(newValue, function(newVal, key) {
+          var bothNaN = _.isNaN(newVal) && _.isNaN(oldValue[key]);
+          if (!bothNaN && oldValue[key] !== newVal) {
+            changeCount++;
+            oldValue[key] = newVal;
+          }
+        });
+
+        // 是否被删
+        _.forOwn(oldValue, function(oldVal, key) {
+          if (!newValue.hasOwnProperty(key)) {
+            changeCount++;
+            delete oldValue[key];
+          }
+        });
       }
     } else {
       if (!self.$$areEqual(newValue, oldValue, false)) {
