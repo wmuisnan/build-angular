@@ -319,10 +319,46 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
   var changeCount = 0;
   var internalWatchFn = function (scope) {
     newValue = watchFn(scope);
-    if (!self.$$areEqual(newValue, oldValue, false)) {
-      changeCount++;
+    if (_.isObject(newValue)) {
+      if (_.isArray(newValue)) {
+        
+        // step1
+        if (!_.isArray(oldValue)) {
+          changeCount++;
+          // 为何把旧值设为数组，特性？
+          oldValue = [];
+        }
+        
+        // step 2
+        if (newValue.length !== oldValue.length) {
+          changeCount++;
+          oldValue.length = newValue.length;
+        }
+
+        // step 3
+        _.forEach(newValue, function(newItem, i) {
+          var bothNaN = _.isNaN(newItem) && _.isNaN(oldValue[i]);
+          if (!bothNaN && newItem !== oldValue[i]) {
+            changeCount++;
+            oldValue[i] = newItem;
+          }
+        });
+        /* 
+          检测是否变化 step1 ~ 3， 符合其中一个条件即可了，为和还要并行？
+          那么，这么做的原因，除了检测变化，另一个原因是更新数据，
+          比如更新长度，数组内容 
+        */
+      } else {
+      
+      }
+    } else {
+      if (!self.$$areEqual(newValue, oldValue, false)) {
+        changeCount++;
+      }
+      oldValue = newValue;
     }
-    oldValue = newValue;
+
+
     return changeCount;
   };
   var internalListenerFn = function () {
