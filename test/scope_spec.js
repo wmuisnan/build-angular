@@ -1716,6 +1716,21 @@ describe('Scope', function () {
     });
 
 
+    it(' res $destroy when destroyed', function() {
+      var listener = jasmine.createSpy();
+      scope.$on('$destroy', listener);
+      scope.$destroy();
+      expect(listener).toHaveBeenCalled();
+    });
+
+    it(' res $destroy on children destroyed', function() {
+      var listener = jasmine.createSpy();
+      child.$on('$destroy', listener);
+      scope.$destroy();
+      expect(listener).toHaveBeenCalled();
+    });
+
+
   });
 
 
