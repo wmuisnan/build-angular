@@ -465,13 +465,13 @@ Scope.prototype.$on = function (eventName, listener) {
 
 Scope.prototype.$emit = function (eventName) {
   var propagationStopped = false;
-  var event = { 
-    name: eventName, 
+  var event = {
+    name: eventName,
     targetScope: this,
-    stopPropagation: function() {
+    stopPropagation: function () {
       propagationStopped = true;
     },
-    preventDefault: function() {
+    preventDefault: function () {
       event.defaultPrevented = true;
     }
   };
@@ -487,15 +487,15 @@ Scope.prototype.$emit = function (eventName) {
 };
 
 Scope.prototype.$broadcast = function (eventName) {
-  var event = { 
-    name: eventName, 
+  var event = {
+    name: eventName,
     targetScope: this,
-    preventDefault: function() {
+    preventDefault: function () {
       event.defaultPrevented = true;
     }
   };
   var listenerArgs = [event].concat(_.tail(arguments));
-  this.$$everyScope(function(scope) {
+  this.$$everyScope(function (scope) {
     event.currentScope = scope;
     scope.$$fireEventOnScope(eventName, listenerArgs);
     return true;
@@ -517,7 +517,11 @@ Scope.prototype.$$fireEventOnScope = function (eventName, listenerArgs) {
     if (listeners[i] === null) {
       listeners.splice(i, 1);
     } else {
-      listeners[i].apply(null, listenerArgs);
+      try {
+        listeners[i].apply(null, listenerArgs);
+      } catch (e) {
+        console.error(e);
+      }
       i++;
     }
   }

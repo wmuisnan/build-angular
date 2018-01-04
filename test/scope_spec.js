@@ -1554,6 +1554,17 @@ describe('Scope', function () {
         expect(event.defaultPrevented).toBe(true);
       });
 
+      it('does not stop on exceptions on ' + method, function () {
+        var listener1 = function (event) {
+          throw 'listener1 throwing an exception';
+        };
+        var listener2 = jasmine.createSpy();
+        scope.$on('someEvent', listener1);
+        scope.$on('someEvent', listener2);
+        scope[method]('someEvent');
+        expect(listener2).toHaveBeenCalled();
+      });
+
 
     });
 
@@ -1716,27 +1727,28 @@ describe('Scope', function () {
     });
 
 
-    it(' res $destroy when destroyed', function() {
+    it(' res $destroy when destroyed', function () {
       var listener = jasmine.createSpy();
       scope.$on('$destroy', listener);
       scope.$destroy();
       expect(listener).toHaveBeenCalled();
     });
 
-    it(' res $destroy on children destroyed', function() {
+    it(' res $destroy on children destroyed', function () {
       var listener = jasmine.createSpy();
       child.$on('$destroy', listener);
       scope.$destroy();
       expect(listener).toHaveBeenCalled();
     });
 
-    it('no longers calls listeners after destroyed', function() {
+    it('no longers calls listeners after destroyed', function () {
       var listener = jasmine.createSpy();
       scope.$on('myEvent', listener);
       scope.$destroy();
       scope.$emit('myEvent');
       expect(listener).not.toHaveBeenCalled();
     });
+
 
 
   });
