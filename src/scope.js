@@ -326,18 +326,20 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
   var oldValue;
   var changeCount = 0;
   // var objLength = 0;
+  var oldLength;
   var internalWatchFn = function (scope) {
+    var newLength;
     newValue = watchFn(scope);
     if (_.isObject(newValue)) {
       if (isArrayLike(newValue)) {
-        
+
         // step1
         if (!_.isArray(oldValue)) { // oldValue 永远是合法的数组。因为后面两步
           changeCount++;
           // 为何把旧值设为数组，特性？ 为后续和下次比较准备。需要往 oldValue 添加内容，设置长度
           oldValue = [];
         }
-        
+
         // step 2
         if (newValue.length !== oldValue.length) {
           changeCount++;
@@ -345,7 +347,7 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
         }
 
         // step 3
-        _.forEach(newValue, function(newItem, i) {
+        _.forEach(newValue, function (newItem, i) {
           var bothNaN = _.isNaN(newItem) && _.isNaN(oldValue[i]);
           if (!bothNaN && newItem !== oldValue[i]) {
             changeCount++;
@@ -358,17 +360,28 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
           比如更新长度，数组内容 
         */
       } else {
+
         if (!_.isObject(oldValue) || isArrayLike(oldValue)) {
           changeCount++;
           oldValue = {};
+          oldLength = 0;
         }
 
-        _.forOwn(newValue, function(newVal, key) {
-          var bothNaN = _.isNaN(newVal) && _.isNaN(oldValue[key]);
-          if (!bothNaN && oldValue[key] !== newVal) {
+        newLength = 0;
+        _.forOwn(newValue, function (newVal, key) {
+          newLength++;
+          if (oldValue.hasOwnProperty(key)) {
+            var bothNaN = _.isNaN(newVal) && _.isNaN(oldValue[key]);
+            if (!bothNaN && oldValue[key] !== newVal) {
+              changeCount++;
+              oldValue[key] = newVal;
+            }
+          } else {
             changeCount++;
+            oldLength++; // 为后续比较准备
             oldValue[key] = newVal;
           }
+
         });
 
         /* 
@@ -379,14 +392,18 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
           changeCount++;
         } 
         */
-
+        
         // 是否被删
-        _.forOwn(oldValue, function(oldVal, key) {
-          if (!newValue.hasOwnProperty(key)) {
-            changeCount++;
-            delete oldValue[key];
-          }
-        });
+        if (oldLength > newLength) {
+          changeCount++;
+          _.forOwn(oldValue, function (oldVal, key) {
+            if (!newValue.hasOwnProperty(key)) {
+              oldLength--;
+              delete oldValue[key];
+            }
+          });          
+        }
+
       }
     } else {
       if (!self.$$areEqual(newValue, oldValue, false)) {
