@@ -312,6 +312,7 @@ Scope.prototype.$destroy = function () {
     }
   }
   this.$$watchers = null;
+  this.$$listeners = {};
 };
 
 function isArrayLike(obj) {
