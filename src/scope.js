@@ -325,6 +325,7 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
   var newValue;
   var oldValue;
   var changeCount = 0;
+  // var objLength = 0;
   var internalWatchFn = function (scope) {
     newValue = watchFn(scope);
     if (_.isObject(newValue)) {
@@ -369,6 +370,15 @@ Scope.prototype.$watchCollection = function (watchFn, listenerFn) {
             oldValue[key] = newVal;
           }
         });
+
+        /* 
+        也可以这样实现
+        var newLength; 
+        if ((newLength = _.keys(newValue).length) !== objLength) {
+          objLength = newLength;
+          changeCount++;
+        } 
+        */
 
         // 是否被删
         _.forOwn(oldValue, function(oldVal, key) {
