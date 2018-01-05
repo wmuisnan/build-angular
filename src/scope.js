@@ -258,12 +258,12 @@ Scope.prototype.$watchGroup = function (watchFns, listenerFn) {
   // 这种区分watch的方法很省事
   var newValues = new Array(watchFns.length);
   var oldValues = new Array(watchFns.length);
-  var changeReactionScheduled = false;
+  var changeReactionScheduled = false; // 干嘛的？？
   var firstRun = true;
 
   if (watchFns.length === 0) {
     var shouldCall = true;
-    self.$evalAsync(function () {
+    self.$evalAsync(function () { // 比较几个值的变化，最后在改变完成后，避免多次比较
       if (shouldCall) {
         listenerFn(newValues, newValues, self);
       }

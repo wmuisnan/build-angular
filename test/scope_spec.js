@@ -7,6 +7,7 @@ describe('Scope', function () {
     expect(scope.aProperty).toBe(1);
   });
 
+  // 检测选择的数据
   describe('digest', function () {
 
     var scope;
@@ -48,7 +49,7 @@ describe('Scope', function () {
       expect(scope.counter).toBe(2);
     });
 
-
+    // 不与其他的值相等， 对象
     it('calls listener when watch value is first undefined', function () {
       scope.counter = 0;
       scope.$watch(
@@ -59,7 +60,7 @@ describe('Scope', function () {
       expect(scope.counter).toBe(1);
     });
 
-
+    
     it('calls listener with new value as old value the first time', function () {
       scope.someValue = 123;
       var oldValueGiven;
@@ -143,6 +144,7 @@ describe('Scope', function () {
       expect(watchExecutions).toBe(301);
     });
 
+    // 案例描述： 为了防止 new watches 停止调用，不停止 digest
     it('does not end digest so that new watches are not run', function () {
       scope.aValue = 'abc';
       scope.counter = 0;
