@@ -26,11 +26,16 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.ch === '\'' || this.ch === '"') {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
+    } else if (this.ch === '[' || this.ch === ']') {
+      this.tokens.push({
+        text: this.ch
+      });
+      this.index++;
     } else if (this.isIdent(this.ch)) {
       this.readIdent();
     } else if (this.isWhitespace(this.ch)) {
       this.index++;
-    }else {
+    } else {
       throw 'Unexpected next character: ' + this.ch;
     }
   }
@@ -44,7 +49,7 @@ the newline, and the non-breaking space
 */
 Lexer.prototype.isWhitespace = function (ch) {
   return ch === ' ' || ch === '\r' || ch === '\t' ||
-         ch === '\n' || ch === '\v' || ch === '\u00A0';
+    ch === '\n' || ch === '\v' || ch === '\u00A0';
 };
 
 
@@ -178,9 +183,12 @@ AST.Program = 'Program';
 
 AST.Literal = 'Literal';
 
+AST.ArrayExpression = 'ArrayExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
+  console.log('tokens', this.tokens)
   return this.program();
   // AST building will be done here
 };
@@ -190,12 +198,36 @@ AST.prototype.program = function () {
 };
 
 AST.prototype.primary = function () {
-  if (this.constants.hasOwnProperty(this.tokens[0].text)) {
+  if (this.expect('[')) {
+    return this.arrayDeclaration();
+  } else if (this.constants.hasOwnProperty(this.tokens[0].text)) {
     return this.constants[this.tokens[0].text];
   } else {
     return this.constant();
   }
 };
+
+AST.prototype.expect = function (e) {
+  if (this.tokens.length > 0) {
+    if (this.tokens[0].text === e || !e) {
+      return this.tokens.shift();
+    }
+  }
+};
+
+AST.prototype.arrayDeclaration = function () {
+  this.consume(']');
+  return { type: AST.ArrayExpression };
+};
+
+AST.prototype.consume = function (e) {
+  var token = this.expect(e);
+  if (!token) {
+    throw 'Unexpected. Expecting: ' + e;
+  }
+  return token;
+};
+
 
 AST.prototype.constant = function () {
   return { type: AST.Literal, value: this.tokens[0].value };
@@ -241,6 +273,8 @@ ASTCompiler.prototype.recurse = function (ast) {
       break;
     case AST.Literal:
       return this.escape(ast.value);
+    case AST.ArrayExpression:
+      return '[]';
   }
 };
 
