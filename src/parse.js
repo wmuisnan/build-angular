@@ -28,11 +28,23 @@ Lexer.prototype.lex = function (text) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
     } else if (this.isIdent(this.ch)) {
       this.readIdent();
-    } else {
+    } else if (this.isWhitespace(this.ch)) {
+      this.index++;
+    }else {
       throw 'Unexpected next character: ' + this.ch;
     }
   }
   return this.tokens;
+};
+
+/* 
+The characters we consider to be whitespace will be the space, 
+the carriage return, the horizontal and vertical tabs, 
+the newline, and the non-breaking space
+*/
+Lexer.prototype.isWhitespace = function (ch) {
+  return ch === ' ' || ch === '\r' || ch === '\t' ||
+         ch === '\n' || ch === '\v' || ch === '\u00A0';
 };
 
 
