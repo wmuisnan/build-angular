@@ -6,6 +6,27 @@ var ESCAPES = {
   'v': '\v', '\'': '\'', '"': '"'
 };
 
+var timeoutId;
+var origin = {};
+function logLastOne (info, tostring) {
+  tostring = tostring === undefined ? true : false;
+  //var info = origin;
+  origin.info = info;
+  if (_.isNumber(timeoutId)) return;
+  timeoutId = setTimeout(function () {
+    var info = origin.info;
+    if (tostring) {
+      info = JSON.stringify(info, null, 2);
+    }
+    console.log(info);
+    timeoutId = null;
+  }, 50);
+}
+
+
+
+var log = logLastOne;
+
 // 把字符串转成 token 流
 function Lexer() {
 }
@@ -26,7 +47,7 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.ch === '\'' || this.ch === '"') {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.ch === '[' || this.ch === ']') {
+    } else if (this.ch === '[' || this.ch === ']' || this.ch === ',') {
       this.tokens.push({
         text: this.ch
       });
@@ -188,7 +209,7 @@ AST.ArrayExpression = 'ArrayExpression';
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
-  console.log('tokens', this.tokens)
+  // console.log('tokens', this.tokens);
   return this.program();
   // AST building will be done here
 };
@@ -201,25 +222,70 @@ AST.prototype.primary = function () {
   if (this.expect('[')) {
     return this.arrayDeclaration();
   } else if (this.constants.hasOwnProperty(this.tokens[0].text)) {
-    return this.constants[this.tokens[0].text];
+    return this.constants[this.consume().text];
   } else {
     return this.constant();
   }
 };
 
-AST.prototype.expect = function (e) {
+
+AST.prototype.arrayDeclaration = function () {
+  var elements = [];
+  if (!this.peek(']')) {
+    do {
+      if (this.peek(']')) { // 支持 尾逗号
+        break;
+      }
+      elements.push(this.primary());
+    } while (this.expect(','));
+  }
+  this.consume(']');
+  // return { type: AST.ArrayExpression };
+  return { type: AST.ArrayExpression, elements: elements };
+};
+
+
+/**
+ * 检测tokens中第一项是否包含特定字符 (不改变tokens)
+ * @param {String} e 需要检测的字符 
+ * @return {Obeact | undefine}  
+ *          e 不存在，返回 tokens 第一项
+ *          e 存在， e 与 tokens 第一项相等， 返回 tokens 第一项
+ *          e 存在， e 与 tokens 第一项不相等， 返回 undefine
+ */
+AST.prototype.peek = function (e) {
   if (this.tokens.length > 0) {
-    if (this.tokens[0].text === e || !e) {
-      return this.tokens.shift();
+    var text = this.tokens[0].text;
+    if (text === e || !e) {
+      return this.tokens[0];
     }
   }
 };
 
-AST.prototype.arrayDeclaration = function () {
-  this.consume(']');
-  return { type: AST.ArrayExpression };
+
+/**
+ * 检测 tokens 中第一项是否包含特定字符(会改变 tokens)
+ * @param {*} e 用于检测的字符
+ * @return {object | undefine} 
+ *        存在，则返回 tokens 第一项。
+ *        否则 返回 undfined
+ */
+AST.prototype.expect = function (e) {
+  var token = this.peek(e);
+  if (token) {
+    return this.tokens.shift();
+  }
 };
 
+
+/**
+ * 检测 tokens 中第一项是否包含特定字符(会改变 tokens)
+ * @param {*} e 用于检测的字符
+ * @return {object} 
+ *        存在，则返回 tokens 第一项。
+ * 
+ * 与 expect 区别，没有找到符合条件的第一项，expect不会报错，consume 会         
+ */
 AST.prototype.consume = function (e) {
   var token = this.expect(e);
   if (!token) {
@@ -228,10 +294,14 @@ AST.prototype.consume = function (e) {
   return token;
 };
 
-
+/* 解析字面量, 数字或者字符串 */
 AST.prototype.constant = function () {
-  return { type: AST.Literal, value: this.tokens[0].value };
+  // return { type: AST.Literal, value: this.tokens[0].value };
+  // this.consume() 也是返回 this.tokens[0]， 意义何在。
+  // 在于会改变 tokens consume 返回并从 tokens 删除掉第一个
+  return { type: AST.Literal, value: this.consume().value };
 };
+
 
 AST.prototype.constants = {
   'null': { type: AST.Literal, value: null },
@@ -257,7 +327,8 @@ ASTCompiler.prototype.compile = function (text) {
   var ast = this.astBuilder.ast(text);
   this.state = { body: [] };
 
-  // console.log('ast',ast, 'text', text);
+  // console.log('ast', ast);
+  logLastOne(ast);
 
   this.recurse(ast);
 
@@ -274,7 +345,10 @@ ASTCompiler.prototype.recurse = function (ast) {
     case AST.Literal:
       return this.escape(ast.value);
     case AST.ArrayExpression:
-      return '[]';
+      var elements = _.map(ast.elements, _.bind(function (element) {
+        return this.recurse(element);
+      }, this));
+      return '[' + elements.join(',') + ']';
   }
 };
 
