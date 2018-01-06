@@ -8,7 +8,7 @@ var ESCAPES = {
 
 var timeoutId;
 var origin = {};
-function logLastOne (info, tostring) {
+function logLastOne(info, tostring) {
   tostring = tostring === undefined ? true : false;
   //var info = origin;
   origin.info = info;
@@ -42,12 +42,12 @@ Lexer.prototype.lex = function (text) {
     this.ch = this.text.charAt(this.index);
     if (
       this.isNumber(this.ch) ||
-      (this.ch === '.' && this.isNumber(this.peek()))
+      (this.is('.') && this.isNumber(this.peek()))
     ) {
       this.readNumber();
-    } else if (this.ch === '\'' || this.ch === '"') {
+    } else if (this.is('\'"')) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.ch === '[' || this.ch === ']' || this.ch === ',') {
+    } else if (this.is('[],{}:')) {
       this.tokens.push({
         text: this.ch
       });
@@ -167,7 +167,11 @@ Lexer.prototype.readNumber = function () {
   });
 };
 
+Lexer.prototype.is = function (chs) {
+  return chs.indexOf(this.ch) >= 0;
+};
 
+/* 读 identifier */
 Lexer.prototype.readIdent = function () {
   var text = '';
   while (this.index < this.text.length) {
@@ -179,7 +183,10 @@ Lexer.prototype.readIdent = function () {
     }
     this.index++;
   }
-  var token = { text: text };
+  var token = {
+    text: text,
+    identifier: true
+  };
   this.tokens.push(token);
 };
 
@@ -206,10 +213,18 @@ AST.Literal = 'Literal';
 
 AST.ArrayExpression = 'ArrayExpression';
 
+AST.ObjectExpression = 'ObjectExpression';
+
+AST.Property = 'Property';
+
+AST.Identifier = 'Identifier';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
-  // console.log('tokens', this.tokens);
+  console.log('text', text);
+  console.log('tokens', this.tokens);
+  logLastOne(this.tokens);
   return this.program();
   // AST building will be done here
 };
@@ -221,6 +236,8 @@ AST.prototype.program = function () {
 AST.prototype.primary = function () {
   if (this.expect('[')) {
     return this.arrayDeclaration();
+  } else if (this.expect('{')) {
+    return this.object();
   } else if (this.constants.hasOwnProperty(this.tokens[0].text)) {
     return this.constants[this.consume().text];
   } else {
@@ -242,6 +259,28 @@ AST.prototype.arrayDeclaration = function () {
   this.consume(']');
   // return { type: AST.ArrayExpression };
   return { type: AST.ArrayExpression, elements: elements };
+};
+
+
+AST.prototype.object = function () {
+  var properties = [];
+  if (!this.peek('}')) {
+    do {
+      var property = { type: AST.Property };
+      // constant 不是干掉空格了吗
+      // property.key = this.constant();
+      if (this.peek().identifier) {
+        property.key = this.identifier();
+      } else {
+        property.key = this.constant();
+      }
+      this.consume(':');
+      property.value = this.primary();
+      properties.push(property);
+    } while (this.expect(','));
+  }
+  this.consume('}');
+  return { type: AST.ObjectExpression, properties: properties };
 };
 
 
@@ -303,6 +342,11 @@ AST.prototype.constant = function () {
 };
 
 
+AST.prototype.identifier = function () {
+  return { type: AST.Identifier, name: this.consume().text };
+};
+
+
 AST.prototype.constants = {
   'null': { type: AST.Literal, value: null },
   'true': { type: AST.Literal, value: true },
@@ -328,7 +372,7 @@ ASTCompiler.prototype.compile = function (text) {
   this.state = { body: [] };
 
   // console.log('ast', ast);
-  logLastOne(ast);
+  // logLastOne(ast);
 
   this.recurse(ast);
 
@@ -349,6 +393,16 @@ ASTCompiler.prototype.recurse = function (ast) {
         return this.recurse(element);
       }, this));
       return '[' + elements.join(',') + ']';
+    case AST.ObjectExpression:
+      var properties = _.map(ast.properties, _.bind(function (property) {
+        // var key = this.escape(property.key.value);
+        var key = property.key.type === AST.Identifier ?
+          property.key.name :
+          this.escape(property.key.value);
+        var value = this.recurse(property.value);
+        return key + ':' + value;
+      }, this));
+      return '{' + properties.join(',') + '}';
   }
 };
 
