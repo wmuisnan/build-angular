@@ -26,6 +26,8 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.ch === '\'' || this.ch === '"') {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
+    } else if (this.isIdent(this.ch)) {
+      this.readIdent();
     } else {
       throw 'Unexpected next character: ' + this.ch;
     }
@@ -40,6 +42,12 @@ Lexer.prototype.isNumber = function (ch) {
 
 Lexer.prototype.isExpOperator = function (ch) {
   return ch === '-' || ch === '+' || this.isNumber(ch);
+};
+
+// 标识符识别法： 以字母，下划线 或 $ 开头
+Lexer.prototype.isIdent = function (ch) {
+  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+    ch === '_' || ch === '$';
 };
 
 /* 
@@ -122,6 +130,22 @@ Lexer.prototype.readNumber = function () {
 };
 
 
+Lexer.prototype.readIdent = function () {
+  var text = '';
+  while (this.index < this.text.length) {
+    var ch = this.text.charAt(this.index);
+    if (this.isIdent(ch) || this.isNumber(ch)) {
+      text += ch;
+    } else {
+      break;
+    }
+    this.index++;
+  }
+  var token = { text: text };
+  this.tokens.push(token);
+};
+
+
 /* 
 It takes a Lex- er as an argument. It also has an ast method, 
 which will execute the AST building for the tokens of a given expression:
@@ -150,11 +174,25 @@ AST.prototype.ast = function (text) {
 };
 
 AST.prototype.program = function () {
-  return { type: AST.Program, body: this.constant() };
+  return { type: AST.Program, body: this.primary() };
+};
+
+AST.prototype.primary = function () {
+  if (this.constants.hasOwnProperty(this.tokens[0].text)) {
+    return this.constants[this.tokens[0].text];
+  } else {
+    return this.constant();
+  }
 };
 
 AST.prototype.constant = function () {
   return { type: AST.Literal, value: this.tokens[0].value };
+};
+
+AST.prototype.constants = {
+  'null': { type: AST.Literal, value: null },
+  'true': { type: AST.Literal, value: true },
+  'false': { type: AST.Literal, value: false }
 };
 
 
@@ -174,6 +212,9 @@ function ASTCompiler(astBuilder) {
 ASTCompiler.prototype.compile = function (text) {
   var ast = this.astBuilder.ast(text);
   this.state = { body: [] };
+
+  // console.log('ast',ast, 'text', text);
+
   this.recurse(ast);
 
   /* jshint -W054 */
@@ -192,11 +233,13 @@ ASTCompiler.prototype.recurse = function (ast) {
 };
 
 ASTCompiler.prototype.escape = function (value) {
-  console.log('escape', value);
   if (_.isString(value)) {
     return '\'' +
+      // 把特俗字符转为 unicode 字符
       value.replace(this.stringEscapeRegex, this.stringEscapeFn) +
       '\'';
+  } else if (_.isNull(value)) {
+    return 'null';
   } else {
     return value;
   }
