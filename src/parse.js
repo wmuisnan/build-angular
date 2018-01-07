@@ -205,6 +205,8 @@ AST.ThisExpression = 'ThisExpression';
 
 AST.MemberExpression = 'MemberExpression';
 
+AST.LocalsExpression = 'LocalsExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
@@ -354,7 +356,8 @@ AST.prototype.constants = {
   'null': { type: AST.Literal, value: null },
   'true': { type: AST.Literal, value: true },
   'false': { type: AST.Literal, value: false },
-  'this': { type: AST.ThisExpression }
+  'this': { type: AST.ThisExpression },
+  '$locals': { type: AST.LocalsExpression }
 };
 
 
@@ -381,7 +384,7 @@ ASTCompiler.prototype.compile = function (text) {
   this.recurse(ast);
 
   /* jshint -W054 */
-  return new Function('s', (
+  return new Function('s', 'l', (
     this.state.vars.length ?
       'var ' + this.state.vars.join(',') + ';' :
       ''
@@ -400,8 +403,16 @@ ASTCompiler.prototype.if_ = function (test, consequent) {
   this.state.body.push('if(', test, '){', consequent, '}');
 };
 
+ASTCompiler.prototype.not = function (e) {
+  return '!(' + e + ')';
+};
+
 ASTCompiler.prototype.assign = function (id, value) {
   return id + '=' + value + ';';
+};
+
+ASTCompiler.prototype.getHasOwnProperty = function (object, property) {
+  return object + '&&(' + this.escape(property) + ' in ' + object + ')';
 };
 
 ASTCompiler.prototype.recurse = function (ast) {
@@ -429,7 +440,9 @@ ASTCompiler.prototype.recurse = function (ast) {
       return '{' + properties.join(',') + '}';
     case AST.Identifier:
       intoId = this.nextId();
-      this.if_('s', this.assign(intoId, this.nonComputedMember('s', ast.name)));
+      this.if_(this.getHasOwnProperty('l', ast.name), this.assign(intoId, this.nonComputedMember('l', ast.name)));
+      this.if_(this.not(this.getHasOwnProperty('l', ast.name)) + ' && s',
+        this.assign(intoId, this.nonComputedMember('s', ast.name)));
       return intoId;
     case AST.ThisExpression:
       return 's';
@@ -439,6 +452,8 @@ ASTCompiler.prototype.recurse = function (ast) {
       this.if_(left,
         this.assign(intoId, this.nonComputedMember(left, ast.property.name)));
       return intoId;
+    case AST.LocalsExpression:
+      return 'l';
   }
 };
 
