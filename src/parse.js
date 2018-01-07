@@ -29,7 +29,7 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.is('\'"')) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.is('[],{}:.')) {
+    } else if (this.is('[],{}:.()')) {
       this.tokens.push({
         text: this.ch
       });
@@ -207,6 +207,8 @@ AST.MemberExpression = 'MemberExpression';
 
 AST.LocalsExpression = 'LocalsExpression';
 
+AST.CallExpression = 'CallExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
@@ -241,7 +243,7 @@ AST.prototype.primary = function () {
     当遇到 '.' 或 '[' 时，
   */
   var next;
-  while ((next = this.expect('.', '['))) {
+  while ((next = this.expect('.', '[', '('))) {
     if (next.text === '[') {
       primary = {
         type: AST.MemberExpression,
@@ -250,13 +252,20 @@ AST.prototype.primary = function () {
         computed: true
       };
       this.consume(']');
-    } else {
+    } else if (next.text === '.') {
       primary = {
         type: AST.MemberExpression, // 判断当前语句为 MemberExpression
         object: primary, // 把之前的解析结果赋给 object 属性
         property: this.identifier(), // 将 '.' 之后的 token 作为标识符处理 
         computed: false
-      };      
+      };
+    } else if (next.text === '(') {
+      primary = {
+        type: AST.CallExpression,
+        callee: primary,
+        arguments: this.parseArguments()
+      };
+      this.consume(')');
     }
 
   }
@@ -279,6 +288,15 @@ AST.prototype.arrayDeclaration = function () {
   return { type: AST.ArrayExpression, elements: elements };
 };
 
+AST.prototype.parseArguments = function () {
+  var args = [];
+  if (!this.peek(')')) {
+    do {
+      args.push(this.primary());
+    } while (this.expect(','));
+  }
+  return args;
+};
 
 AST.prototype.object = function () {
   var properties = [];
@@ -429,7 +447,7 @@ ASTCompiler.prototype.getHasOwnProperty = function (object, property) {
   return object + '&&(' + this.escape(property) + ' in ' + object + ')';
 };
 
-ASTCompiler.prototype.computedMember = function(left, right) {
+ASTCompiler.prototype.computedMember = function (left, right) {
   return '(' + left + ')[' + right + ']';
 };
 
@@ -478,6 +496,12 @@ ASTCompiler.prototype.recurse = function (ast) {
       return intoId;
     case AST.LocalsExpression:
       return 'l';
+    case AST.CallExpression:
+      var callee = this.recurse(ast.callee);
+      var args = _.map(ast.arguments, _.bind(function(arg) {
+        return this.recurse(arg);
+      }, this));
+      return callee + '&&' + callee + '(' + args.join(',') + ')';
   }
 };
 
