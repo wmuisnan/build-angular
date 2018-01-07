@@ -29,7 +29,7 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.is('\'"')) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.is('[],{}:')) {
+    } else if (this.is('[],{}:.')) {
       this.tokens.push({
         text: this.ch
       });
@@ -203,6 +203,8 @@ AST.Identifier = 'Identifier';
 
 AST.ThisExpression = 'ThisExpression';
 
+AST.MemberExpression = 'MemberExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
@@ -219,17 +221,31 @@ AST.prototype.program = function () {
 };
 
 AST.prototype.primary = function () {
+  var primary;
   if (this.expect('[')) {
-    return this.arrayDeclaration();
+    primary = this.arrayDeclaration();
   } else if (this.expect('{')) {
-    return this.object();
+    primary = this.object();
   } else if (this.constants.hasOwnProperty(this.tokens[0].text)) {
-    return this.constants[this.consume().text];
+    primary = this.constants[this.consume().text];
   } else if (this.peek().identifier) {
-    return this.identifier();
+    primary = this.identifier();
   } else {
-    return this.constant();
+    primary = this.constant();
   }
+
+  /*
+    解析完一部分，继续往下走，
+    当遇到 '.' 时，
+  */
+  while (this.expect('.')) {
+    primary = {
+      type: AST.MemberExpression, // 判断当前语句为 MemberExpression
+      object: primary, // 把之前的解析结果赋给 object 属性
+      property: this.identifier() // 将 '.' 之后的 token 作为标识符处理 
+    };
+  }
+  return primary;
 };
 
 
@@ -389,6 +405,7 @@ ASTCompiler.prototype.assign = function (id, value) {
 };
 
 ASTCompiler.prototype.recurse = function (ast) {
+  var intoId;
   switch (ast.type) {
     case AST.Program:
       this.state.body.push('return ', this.recurse(ast.body), ';');
@@ -411,11 +428,17 @@ ASTCompiler.prototype.recurse = function (ast) {
       }, this));
       return '{' + properties.join(',') + '}';
     case AST.Identifier:
-      var intoId = this.nextId();
+      intoId = this.nextId();
       this.if_('s', this.assign(intoId, this.nonComputedMember('s', ast.name)));
       return intoId;
     case AST.ThisExpression:
       return 's';
+    case AST.MemberExpression:
+      intoId = this.nextId();
+      var left = this.recurse(ast.object);
+      this.if_(left,
+        this.assign(intoId, this.nonComputedMember(left, ast.property.name)));
+      return intoId;
   }
 };
 
