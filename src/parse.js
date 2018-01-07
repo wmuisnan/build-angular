@@ -201,6 +201,8 @@ AST.Property = 'Property';
 
 AST.Identifier = 'Identifier';
 
+AST.ThisExpression = 'ThisExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
@@ -335,7 +337,8 @@ AST.prototype.identifier = function () {
 AST.prototype.constants = {
   'null': { type: AST.Literal, value: null },
   'true': { type: AST.Literal, value: true },
-  'false': { type: AST.Literal, value: false }
+  'false': { type: AST.Literal, value: false },
+  'this': { type: AST.ThisExpression }
 };
 
 
@@ -411,6 +414,8 @@ ASTCompiler.prototype.recurse = function (ast) {
       var intoId = this.nextId();
       this.if_('s', this.assign(intoId, this.nonComputedMember('s', ast.name)));
       return intoId;
+    case AST.ThisExpression:
+      return 's';
   }
 };
 
