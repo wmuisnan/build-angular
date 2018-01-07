@@ -7,20 +7,28 @@ var ESCAPES = {
 };
 
 var timeoutId;
+var prevTimeoutId;
 var origin = {};
 function logLastOne(info, tostring) {
   tostring = tostring === undefined ? true : false;
-  //var info = origin;
-  origin.info = info;
-  if (_.isNumber(timeoutId)) return;
-  timeoutId = setTimeout(function () {
-    var info = origin.info;
-    if (tostring) {
-      info = JSON.stringify(info, null, 2);
+
+  if (_.isObject(info)) {
+    if (_.isArray(info)) {
+      origin.tokens = _.cloneDeep(info);
+    } else {
+      origin.ast = _.cloneDeep(info);
     }
-    console.log(info);
+  } else {
+    origin.text = info;
+  }
+
+  if (_.isNumber(timeoutId)) return;
+
+  timeoutId = setTimeout(function () {
+    console.log(JSON.stringify(origin, null, 2));
     timeoutId = null;
-  }, 50);
+    origin = {};
+  }, 150);
 }
 
 
@@ -222,8 +230,9 @@ AST.Identifier = 'Identifier';
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
-  console.log('text', text);
-  console.log('tokens', this.tokens);
+  // console.log('text', text);
+  // console.log('tokens', this.tokens);
+  logLastOne(text);
   logLastOne(this.tokens);
   return this.program();
   // AST building will be done here
@@ -240,6 +249,8 @@ AST.prototype.primary = function () {
     return this.object();
   } else if (this.constants.hasOwnProperty(this.tokens[0].text)) {
     return this.constants[this.consume().text];
+  } else if (this.peek().identifier) {
+    return this.identifier();
   } else {
     return this.constant();
   }
@@ -372,13 +383,18 @@ ASTCompiler.prototype.compile = function (text) {
   this.state = { body: [] };
 
   // console.log('ast', ast);
-  // logLastOne(ast);
+  logLastOne(ast);
 
   this.recurse(ast);
 
   /* jshint -W054 */
-  return new Function(this.state.body.join(''));
+  return new Function('s', this.state.body.join(''));
   /* jshint +W054 */
+};
+
+
+ASTCompiler.prototype.if_ = function (test, consequent) {
+  this.state.body.push('if(', test, '){', consequent, '}');
 };
 
 ASTCompiler.prototype.recurse = function (ast) {
@@ -403,7 +419,15 @@ ASTCompiler.prototype.recurse = function (ast) {
         return key + ':' + value;
       }, this));
       return '{' + properties.join(',') + '}';
+    case AST.Identifier:
+      this.state.body.push('var v0;');
+      this.if_('s', 'v0=' + this.nonComputedMember('s', ast.name) + ';');
+      return 'v0';
   }
+};
+
+ASTCompiler.prototype.nonComputedMember = function (left, right) {
+  return '(' + left + ').' + right;
 };
 
 ASTCompiler.prototype.escape = function (value) {
@@ -445,6 +469,7 @@ Parser.prototype.parse = function (text) {
 
 
 function parse(expr) {
+  // timeoutId++; // 为了log, 跟解析器无关
   var lexer = new Lexer();
   var parser = new Parser(lexer);
   return parser.parse(expr);
