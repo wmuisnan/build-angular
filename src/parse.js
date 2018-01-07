@@ -238,14 +238,27 @@ AST.prototype.primary = function () {
 
   /*
     解析完一部分，继续往下走，
-    当遇到 '.' 时，
+    当遇到 '.' 或 '[' 时，
   */
-  while (this.expect('.')) {
-    primary = {
-      type: AST.MemberExpression, // 判断当前语句为 MemberExpression
-      object: primary, // 把之前的解析结果赋给 object 属性
-      property: this.identifier() // 将 '.' 之后的 token 作为标识符处理 
-    };
+  var next;
+  while ((next = this.expect('.', '['))) {
+    if (next.text === '[') {
+      primary = {
+        type: AST.MemberExpression,
+        object: primary,
+        property: this.primary(),
+        computed: true
+      };
+      this.consume(']');
+    } else {
+      primary = {
+        type: AST.MemberExpression, // 判断当前语句为 MemberExpression
+        object: primary, // 把之前的解析结果赋给 object 属性
+        property: this.identifier(), // 将 '.' 之后的 token 作为标识符处理 
+        computed: false
+      };      
+    }
+
   }
   return primary;
 };
@@ -297,10 +310,11 @@ AST.prototype.object = function () {
  *          e 存在， e 与 tokens 第一项相等， 返回 tokens 第一项
  *          e 存在， e 与 tokens 第一项不相等， 返回 undefine
  */
-AST.prototype.peek = function (e) {
+AST.prototype.peek = function (e1, e2, e3, e4) {
   if (this.tokens.length > 0) {
     var text = this.tokens[0].text;
-    if (text === e || !e) {
+    if (text === e1 || text === e2 || text === e3 || text === e4 ||
+      (!e1 && !e2 && !e3 && !e4)) {
       return this.tokens[0];
     }
   }
@@ -314,8 +328,8 @@ AST.prototype.peek = function (e) {
  *        存在，则返回 tokens 第一项。
  *        否则 返回 undfined
  */
-AST.prototype.expect = function (e) {
-  var token = this.peek(e);
+AST.prototype.expect = function (e1, e2, e3, e4) {
+  var token = this.peek(e1, e2, e3, e4);
   if (token) {
     return this.tokens.shift();
   }
@@ -415,6 +429,10 @@ ASTCompiler.prototype.getHasOwnProperty = function (object, property) {
   return object + '&&(' + this.escape(property) + ' in ' + object + ')';
 };
 
+ASTCompiler.prototype.computedMember = function(left, right) {
+  return '(' + left + ')[' + right + ']';
+};
+
 ASTCompiler.prototype.recurse = function (ast) {
   var intoId;
   switch (ast.type) {
@@ -449,8 +467,14 @@ ASTCompiler.prototype.recurse = function (ast) {
     case AST.MemberExpression:
       intoId = this.nextId();
       var left = this.recurse(ast.object);
-      this.if_(left,
-        this.assign(intoId, this.nonComputedMember(left, ast.property.name)));
+      if (ast.computed) {
+        var right = this.recurse(ast.property);
+        this.if_(left,
+          this.assign(intoId, this.computedMember(left, right)));
+      } else {
+        this.if_(left,
+          this.assign(intoId, this.nonComputedMember(left, ast.property.name)));
+      }
       return intoId;
     case AST.LocalsExpression:
       return 'l';
