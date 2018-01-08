@@ -49,7 +49,7 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.is('\'"')) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.is('[],{}:.()?')) {
+    } else if (this.is('[],{}:.()?;')) {
       this.tokens.push({
         text: this.ch
       });
@@ -266,12 +266,24 @@ AST.prototype.ast = function (text) {
 };
 
 AST.prototype.program = function () {
-  return { type: AST.Program, body: this.assignment() };
+  // return { type: AST.Program, body: this.assignment() };
+  var body = [];
+  while (true) {
+    if (this.tokens.length) {
+      body.push(this.assignment());
+    }
+    if (!this.expect(';')) {
+      return { type: AST.Program, body: body };
+    }
+  }
 };
 
 AST.prototype.primary = function () {
   var primary;
-  if (this.expect('[')) {
+  if (this.expect('(')) {
+    primary = this.assignment();
+    this.consume(')');
+  } else if (this.expect('[')) {
     primary = this.arrayDeclaration();
   } else if (this.expect('{')) {
     primary = this.object();
@@ -642,7 +654,10 @@ ASTCompiler.prototype.recurse = function (ast, context, create) {
   var intoId;
   switch (ast.type) {
     case AST.Program:
-      this.state.body.push('return ', this.recurse(ast.body), ';');
+      _.forEach(_.initial(ast.body), _.bind(function (stmt) {
+        this.state.body.push(this.recurse(stmt), ';');
+      }, this));
+      this.state.body.push('return ', this.recurse(_.last(ast.body)), ';');
       break;
     case AST.Literal:
       return this.escape(ast.value);
