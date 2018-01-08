@@ -341,7 +341,6 @@ describe('parse', function () {
 
   it('creates the objects in the assignment path that do not exist', function () {
     var fn = parse('some["nested"].property.path = 42');
-    console.log('fn', fn.toString());
     var scope = {};
     fn(scope);
     expect(scope.some.nested.property.path).toBe(42);
@@ -384,6 +383,48 @@ describe('parse', function () {
     }).toThrow();
   });
 
+
+  // chapter 8 Operator Expressions
+  it('parses a unary +', function () {
+    expect(parse('+42')()).toBe(42);
+    expect(parse('+a')({ a: 42 })).toBe(42);
+  });
+
+  it('replaces unde ned with zero for unary +', function () {
+    expect(parse('+a')({})).toBe(0);
+  });
+
+  it('parses a unary !', function () {
+    expect(parse('!true')()).toBe(false);
+    expect(parse('!42')()).toBe(false);
+    expect(parse('!a')({ a: false })).toBe(true);
+    expect(parse('!!a')({ a: false })).toBe(false);
+  });
+
+  it('parses a unary -', function () {
+    expect(parse('-42')()).toBe(-42);
+    expect(parse('-a')({ a: -42 })).toBe(42);
+    expect(parse('--a')({ a: -42 })).toBe(-42);
+    expect(parse('-a')({})).toBe(0);
+  });
+
+  it('parses a ! in a string', function () {
+    expect(parse('"!"')()).toBe('!');
+  });
+
+  it('parses a multiplication', function() {
+    expect(parse('21 * 2')()).toBe(42);
+  });
+  it('parses a division', function() {
+    expect(parse('84 / 2')()).toBe(42);
+  });
+  it('parses a remainder', function() {
+    expect(parse('85 % 43')()).toBe(42);
+  });
+
+  it('parses several multiplicatives', function() {
+    expect(parse('36 * 2 % 5')()).toBe(2);
+  });
 
 
 

@@ -13,6 +13,15 @@ var log = logLastOne;
 function Lexer() {
 }
 
+var OPERATORS = {
+  '+': true,
+  '!': true,
+  '-': true,
+  '*': true,
+  '/': true,
+  '%': true
+};
+
 // 传值下一层
 Lexer.prototype.lex = function (text) {
   // Tokenization will be done here
@@ -39,7 +48,13 @@ Lexer.prototype.lex = function (text) {
     } else if (this.isWhitespace(this.ch)) {
       this.index++;
     } else {
-      throw 'Unexpected next character: ' + this.ch;
+      var op = OPERATORS[this.ch];
+      if (op) {
+        this.tokens.push({ text: this.ch });
+        this.index++;
+      } else {
+        throw 'Unexpected next character: ' + this.ch;
+      }
     }
   }
   return this.tokens;
@@ -85,9 +100,11 @@ Lexer.prototype.peek = function () {
 Lexer.prototype.readString = function (quote) {
   this.index++;
   var string = '';
+  var rawString = quote;
   var escape = false;
   while (this.index < this.text.length) {
     var ch = this.text.charAt(this.index);
+    rawString += ch;
     if (escape) {
       if (ch === 'u') {
         var hex = this.text.substring(this.index + 1, this.index + 5);
@@ -105,7 +122,7 @@ Lexer.prototype.readString = function (quote) {
     } else if (ch === quote) {
       this.index++;
       this.tokens.push({
-        text: string,
+        text: rawString,
         value: string
       });
       return;
@@ -211,6 +228,10 @@ AST.CallExpression = 'CallExpression';
 
 AST.AssignmentExpression = 'AssignmentExpression';
 
+AST.UnaryExpression = 'UnaryExpression';
+
+AST.BinaryExpression = 'BinaryExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
@@ -276,12 +297,42 @@ AST.prototype.primary = function () {
 
 
 AST.prototype.assignment = function () {
-  var left = this.primary();
+  // var left = this.primary();
+  var left = this.multiplicative();
   if (this.expect('=')) {
-    var right = this.primary();
+    // var right = this.primary();
+    var right = this.multiplicative();
     return { type: AST.AssignmentExpression, left: left, right: right };
   }
   return left;
+};
+
+AST.prototype.multiplicative = function () {
+
+  var left = this.unary();
+  var token;
+  while ((token = this.expect('*', '/', '%'))) {
+    left = {
+      type: AST.BinaryExpression,
+      left: left,
+      operator: token.text,
+      right: this.unary()
+    };
+  }
+  return left;
+};
+
+AST.prototype.unary = function () {
+  var token;
+  if ((token = this.expect('+', '!', '-'))) {
+    return {
+      type: AST.UnaryExpression,
+      operator: token.text,
+      argument: this.unary()
+    };
+  } else {
+    return this.primary();
+  }
 };
 
 
@@ -426,17 +477,34 @@ ASTCompiler.prototype.compile = function (text) {
   logLastOne(ast);
 
   this.recurse(ast);
-  
+
   var fnString = 'var fn=function(s,l){' +
     (this.state.vars.length ?
       'var ' + this.state.vars.join(',') + ';' :
       ''
     ) + this.state.body.join('') + '}; return fn;';
   /* jshint -W054 */
-  return new Function('ensureSafeMemberName', fnString)(ensureSafeMemberName);
+  return new Function(
+    'ensureSafeMemberName',
+    'ifDefined',
+    fnString)(
+    ensureSafeMemberName,
+    ifDefined
+    );
   /* jshint +W054 */
 };
 
+function ifDefined(value, defaultValue) {
+  return typeof value === 'undefined' ? defaultValue : value;
+}
+
+function ensureSafeMemberName(name) {
+  if (name === 'constructor' || name === '__proto__' ||
+    name === '__defineGetter__' || name === '__defineSetter__' ||
+    name === '__lookupGetter__' || name === '__lookupSetter__') {
+    throw 'Attempting to access a disallowed  eld in Angular expressions!';
+  }
+}
 
 ASTCompiler.prototype.nextId = function () {
   var id = 'v' + (this.state.nextId++);
@@ -461,13 +529,7 @@ ASTCompiler.prototype.getHasOwnProperty = function (object, property) {
   return object + '&&(' + this.escape(property) + ' in ' + object + ')';
 };
 
-function ensureSafeMemberName(name) {
-  if (name === 'constructor' || name === '__proto__' ||
-    name === '__defineGetter__' || name === '__defineSetter__' ||
-    name === '__lookupGetter__' || name === '__lookupSetter__') {
-    throw 'Attempting to access a disallowed  eld in Angular expressions!';
-  }
-}
+
 
 
 ASTCompiler.prototype.recurse = function (ast, context, create) {
@@ -575,10 +637,21 @@ ASTCompiler.prototype.recurse = function (ast, context, create) {
         leftExpr = this.nonComputedMember(leftContext.context, leftContext.name);
       }
       return this.assign(leftExpr, this.recurse(ast.right));
+    case AST.UnaryExpression:
+      return ast.operator + '(' + this.ifDefined(this.recurse(ast.argument), 0) + ')';
+    case AST.BinaryExpression:
+      return '(' + this.recurse(ast.left) + ')' +
+        ast.operator +
+        '(' + this.recurse(ast.right) + ')';
   }
 };
 
-ASTCompiler.prototype.addEnsureSafeMemberName = function(expr) {
+
+ASTCompiler.prototype.ifDefined = function (value, defaultValue) {
+  return 'ifDefined(' + value + ',' + this.escape(defaultValue) + ')';
+};
+
+ASTCompiler.prototype.addEnsureSafeMemberName = function (expr) {
   this.state.body.push('ensureSafeMemberName(' + expr + ');');
 };
 
