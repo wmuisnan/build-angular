@@ -19,7 +19,16 @@ var OPERATORS = {
   '-': true,
   '*': true,
   '/': true,
-  '%': true
+  '%': true,
+  '=': true,
+  '==': true,
+  '!=': true,
+  '===': true,
+  '!==': true,
+  '<': true,
+  '>': true,
+  '<=': true,
+  '>=': true
 };
 
 // 传值下一层
@@ -38,7 +47,7 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.is('\'"')) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.is('[],{}:.()=')) {
+    } else if (this.is('[],{}:.()')) {
       this.tokens.push({
         text: this.ch
       });
@@ -48,10 +57,16 @@ Lexer.prototype.lex = function (text) {
     } else if (this.isWhitespace(this.ch)) {
       this.index++;
     } else {
-      var op = OPERATORS[this.ch];
-      if (op) {
-        this.tokens.push({ text: this.ch });
-        this.index++;
+      var ch = this.ch;
+      var ch2 = this.ch + this.peek();
+      var ch3 = this.ch + this.peek() + this.peek(2);
+      var op = OPERATORS[ch];
+      var op2 = OPERATORS[ch2];
+      var op3 = OPERATORS[ch3];
+      if (op || op2 || op3) {
+        var token = op3 ? ch3 : (op2 ? ch2 : ch);
+        this.tokens.push({ text: token });
+        this.index += token.length;
       } else {
         throw 'Unexpected next character: ' + this.ch;
       }
@@ -89,9 +104,10 @@ Lexer.prototype.isIdent = function (ch) {
 returns the next character in the text, 
 without moving the current character index forward
 */
-Lexer.prototype.peek = function () {
-  return this.index < this.text.length - 1 ?
-    this.text.charAt(this.index + 1) :
+Lexer.prototype.peek = function (n) {
+  n = n || 1;
+  return this.index + n < this.text.length ?
+    this.text.charAt(this.index + n) :
     false;
 };
 
@@ -298,11 +314,52 @@ AST.prototype.primary = function () {
 
 AST.prototype.assignment = function () {
   // var left = this.primary();
-  var left = this.multiplicative();
+  var left = this.equality();
   if (this.expect('=')) {
     // var right = this.primary();
-    var right = this.multiplicative();
+    var right = this.equality();
     return { type: AST.AssignmentExpression, left: left, right: right };
+  }
+  return left;
+};
+
+AST.prototype.equality = function () {
+  var left = this.relational();
+  var token;
+  while ((token = this.expect('==', '!=', '===', '!=='))) {
+    left = {
+      type: AST.BinaryExpression,
+      left: left,
+      operator: token.text,
+      right: this.relational()
+    };
+  }
+  return left;
+};
+AST.prototype.relational = function () {
+  var left = this.additive();
+  var token;
+  while ((token = this.expect('<', '>', '<=', '>='))) {
+    left = {
+      type: AST.BinaryExpression,
+      left: left,
+      operator: token.text,
+      right: this.additive()
+    };
+  }
+  return left;
+};
+
+AST.prototype.additive = function () {
+  var left = this.multiplicative();
+  var token;
+  while ((token = this.expect('+')) || (token = this.expect('-'))) {
+    left = {
+      type: AST.BinaryExpression,
+      left: left,
+      operator: token.text,
+      right: this.multiplicative()
+    };
   }
   return left;
 };
@@ -640,9 +697,16 @@ ASTCompiler.prototype.recurse = function (ast, context, create) {
     case AST.UnaryExpression:
       return ast.operator + '(' + this.ifDefined(this.recurse(ast.argument), 0) + ')';
     case AST.BinaryExpression:
-      return '(' + this.recurse(ast.left) + ')' +
-        ast.operator +
-        '(' + this.recurse(ast.right) + ')';
+      if (ast.operator === '+' || ast.operator === '-') {
+        return '(' + this.ifDefined(this.recurse(ast.left), 0) + ')' +
+          ast.operator +
+          '(' + this.ifDefined(this.recurse(ast.right), 0) + ')';
+      } else {
+        return '(' + this.recurse(ast.left) + ')' +
+          ast.operator +
+          '(' + this.recurse(ast.right) + ')';
+      }
+      break;
   }
 };
 
