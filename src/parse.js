@@ -49,7 +49,7 @@ Lexer.prototype.lex = function (text) {
       this.readNumber();
     } else if (this.is('\'"')) {
       this.readString(this.ch); // 很机智啊。直接传进去，不用重新另声明一个变量
-    } else if (this.is('[],{}:.()')) {
+    } else if (this.is('[],{}:.()?')) {
       this.tokens.push({
         text: this.ch
       });
@@ -252,6 +252,8 @@ AST.BinaryExpression = 'BinaryExpression';
 
 AST.LogicalExpression = 'LogicalExpression';
 
+AST.ConditionalExpression = 'ConditionalExpression';
+
 // 传值下一层
 AST.prototype.ast = function (text) {
   this.tokens = this.lexer.lex(text);
@@ -317,12 +319,29 @@ AST.prototype.primary = function () {
 
 
 AST.prototype.assignment = function () {
-  var left = this.logicalOR();
+  var left = this.ternary();
   if (this.expect('=')) {
-    var right = this.logicalOR();
+    var right = this.ternary();
     return { type: AST.AssignmentExpression, left: left, right: right };
   }
   return left;
+};
+
+AST.prototype.ternary = function () {
+  var test = this.logicalOR();
+  if (this.expect('?')) {
+    var consequent = this.assignment();
+    if (this.consume(':')) {
+      var alternate = this.assignment();
+      return {
+        type: AST.ConditionalExpression,
+        test: test,
+        consequent: consequent,
+        alternate: alternate
+      };
+    }
+  }
+  return test;
 };
 
 AST.prototype.logicalOR = function () {
@@ -743,6 +762,16 @@ ASTCompiler.prototype.recurse = function (ast, context, create) {
       this.state.body.push(this.assign(intoId, this.recurse(ast.left)));
       this.if_(ast.operator === '&&' ? intoId : this.not(intoId),
         this.assign(intoId, this.recurse(ast.right)));
+      return intoId;
+
+    case AST.ConditionalExpression:
+      intoId = this.nextId();
+      var testId = this.nextId();
+      this.state.body.push(this.assign(testId, this.recurse(ast.test)));
+      this.if_(testId,
+        this.assign(intoId, this.recurse(ast.consequent)));
+      this.if_(this.not(testId),
+        this.assign(intoId, this.recurse(ast.alternate)));
       return intoId;
   }
 };
