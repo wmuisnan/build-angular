@@ -20,7 +20,14 @@ function $CompileProvider($provide) {
         $provide.factory(name + 'Directive', ['$injector', function ($injector) {
           console.log('directive run');
           var factories = hasDirectives[name];
-          return _.map(factories, $injector.invoke);
+          return _.map(factories, function (factory, i) {
+            var directive = $injector.invoke(factory);
+            directive.restrict = directive.restrict || 'EA';
+            directive.priority = directive.priority || 0;
+            directive.name = directive.name || name;
+            directive.index = i;
+            return directive;
+          });
         }]);
 
       }
@@ -47,7 +54,7 @@ function $CompileProvider($provide) {
       if (hasDirectives.hasOwnProperty(name)) {
         // directives.push.apply(directives, $injector.get(name + 'Directive'));
         var foundDirectives = $injector.get(name + 'Directive');
-        var applicableDirectives = _.filter(foundDirectives, function(dir) {
+        var applicableDirectives = _.filter(foundDirectives, function (dir) {
           return dir.restrict.indexOf(mode) !== -1;
         });
         directives.push.apply(directives, applicableDirectives);
@@ -77,6 +84,19 @@ function $CompileProvider($provide) {
       });
     }
 
+    function byPriority(a, b) {
+      var diff = b.priority - a.priority;
+      if (diff !== 0) {
+        return diff;
+      } else {
+        if (a.name !== b.name) {
+          return (a.name < b.name ? -1 : 1);
+        } else {
+          return a.index - b.index;
+        }
+      }
+    }
+
     // 找指令
     function collectDirectives(node) {
       var directives = [];
@@ -104,7 +124,7 @@ function $CompileProvider($provide) {
       }
 
 
-
+      directives.sort(byPriority);
 
       return directives;
     }
