@@ -43,6 +43,17 @@ function $CompileProvider($provide) {
 
   this.$get = ['$injector', function ($injector) {
 
+    function Attributes(element) {
+      this.$$element = element;
+    }
+
+    Attributes.prototype.$set = function (key, value, writeAttr) {
+      this[key] = value;
+      if (writeAttr !== false) {
+        this.$$element.attr(key, value);
+      }
+    };
+
     var PREFIX_REGEXP = /(x[\:\-_]|data[\:\-_])/i;
 
     function directiveNormalize(name) {
@@ -79,7 +90,7 @@ function $CompileProvider($provide) {
     // 编译元素： 找指令，把元素丢到指令里去
     function compileNodes($compileNodes) {
       _.forEach($compileNodes, function (node) {
-        var attrs = {};
+        var attrs = new Attributes($(node));
         // 找指令
         var directives = collectDirectives(node, attrs);
         // 把元素丢到指令里去
@@ -166,11 +177,11 @@ function $CompileProvider($provide) {
           addDirective(directives, normalizedAttrName, 'A', attrStartName, attrEndName);
 
           // 在这个判断条件下，后面的属性不会覆盖前者。 whatever="43"  whatever="41"(或者DOM.attrs会合并同名？)
-          if (isNgAttr || !attrs.hasOwnProperty(normalizedAttrName)) { 
+          if (isNgAttr || !attrs.hasOwnProperty(normalizedAttrName)) {
             attrs[normalizedAttrName] = attr.value.trim();
             if (isBooleanAttribute(node, normalizedAttrName)) {
               attrs[normalizedAttrName] = true;
-            }            
+            }
           }
 
         });
