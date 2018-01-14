@@ -75,10 +75,10 @@ function $CompileProvider($provide) {
         // 找指令
         var directives = collectDirectives(node);
         // 把元素丢到指令里去
-        applyDirectivesToNode(directives, node);
+        var terminal = applyDirectivesToNode(directives, node);
 
         // 如果有子级，递归找下去
-        if (node.childNodes && node.childNodes.length) {
+        if (!terminal && node.childNodes && node.childNodes.length) {
           compileNodes(node.childNodes);
         }
       });
@@ -132,11 +132,21 @@ function $CompileProvider($provide) {
     // 应用指令, 把元素丢到指令里去
     function applyDirectivesToNode(directives, compileNode) {
       var $compileNode = $(compileNode);
+      var terminalPriority = -Number.MAX_VALUE;
+      var terminal = false;
       _.forEach(directives, function (directive) {
+        if (directive.priority < terminalPriority) {
+          return false;
+        }
         if (directive.compile) {
           directive.compile($compileNode);
         }
+        if (directive.terminal) {
+          terminal = true;
+          terminalPriority = directive.priority;
+        }
       });
+      return terminal;
     }
 
     return compile;
