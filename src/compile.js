@@ -105,6 +105,7 @@ function $CompileProvider($provide) {
     }
 
     function addDirective(directives, name, mode, attrStartName, attrEndName) {
+      var match;
       if (hasDirectives.hasOwnProperty(name)) {
         // directives.push.apply(directives, $injector.get(name + 'Directive'));
         var foundDirectives = $injector.get(name + 'Directive');
@@ -119,8 +120,11 @@ function $CompileProvider($provide) {
             });
           }
           directives.push(directive);
+          match = directive;
         });
+
       }
+      return match;
     }
 
     function nodeName(element) {
@@ -195,6 +199,7 @@ function $CompileProvider($provide) {
     // 找指令
     function collectDirectives(node, attrs) {
       var directives = [];
+      var match;
       if (node.nodeType === Node.ELEMENT_NODE) {
         var normalizedNodeName = directiveNormalize(nodeName(node).toLowerCase());
         addDirective(directives, normalizedNodeName, 'E');
@@ -234,8 +239,22 @@ function $CompileProvider($provide) {
         _.forEach(node.classList, function (cls) {
           var normalizedClassName = directiveNormalize(cls);
           addDirective(directives, normalizedClassName, 'C');
+          if (addDirective(directives, normalizedClassName, 'C')) {
+            attrs[normalizedClassName] = undefined;
+          }
         });
+        var className = node.className;
+        if (_.isString(className) && !_.isEmpty(className)) {
+          while ((match = /([\d\w\-_]+)(?:\:([^;]+))?;?/.exec(className))) {
+            var normalizedClassName = directiveNormalize(match[1]);
+            if (addDirective(directives, normalizedClassName, 'C')) {
+              attrs[normalizedClassName] = match[2] ? match[2].trim() : undefined;
+            }
+            className = className.substr(match.index + match[0].length);
+          }
+        }
       } else if (node.nodeType === Node.COMMENT_NODE) {
+        match = /^\s*directive\:\s*([\d\w\-_]+)/.exec(node.nodeValue);
         var match = /^\s*directive\:\s*([\d\w\-_]+)/.exec(node.nodeValue);
         if (match) {
           addDirective(directives, directiveNormalize(match[1]), 'M');
