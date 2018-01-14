@@ -147,7 +147,8 @@ function $CompileProvider($provide) {
           var attrStartName, attrEndName;
           var name = attr.name;
           var normalizedAttrName = directiveNormalize(name.toLowerCase());
-          if (/^ngAttr[A-Z]/.test(normalizedAttrName)) {
+          var isNgAttr = /^ngAttr[A-Z]/.test(normalizedAttrName);
+          if (isNgAttr) {
             name = _.kebabCase(
               normalizedAttrName[6].toLowerCase() +
               normalizedAttrName.substring(7)
@@ -163,10 +164,15 @@ function $CompileProvider($provide) {
           }
           normalizedAttrName = directiveNormalize(name.toLowerCase());
           addDirective(directives, normalizedAttrName, 'A', attrStartName, attrEndName);
-          attrs[normalizedAttrName] = attr.value.trim();
-          if (isBooleanAttribute(node, normalizedAttrName)) {
-            attrs[normalizedAttrName] = true;
+
+          // 在这个判断条件下，后面的属性不会覆盖前者。 whatever="43"  whatever="41"(或者DOM.attrs会合并同名？)
+          if (isNgAttr || !attrs.hasOwnProperty(normalizedAttrName)) { 
+            attrs[normalizedAttrName] = attr.value.trim();
+            if (isBooleanAttribute(node, normalizedAttrName)) {
+              attrs[normalizedAttrName] = true;
+            }            
           }
+
         });
         _.forEach(node.classList, function (cls) {
           var normalizedClassName = directiveNormalize(cls);
