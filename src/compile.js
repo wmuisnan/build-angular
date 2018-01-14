@@ -113,6 +113,30 @@ function $CompileProvider($provide) {
       return false;
     }
 
+    var BOOLEAN_ATTRS = {
+      multiple: true,
+      selected: true,
+      checked: true,
+      disabled: true,
+      readOnly: true,
+      required: true,
+      open: true
+    };
+
+    var BOOLEAN_ELEMENTS = {
+      INPUT: true,
+      SELECT: true,
+      OPTION: true,
+      TEXTAREA: true,
+      BUTTON: true,
+      FORM: true,
+      DETAILS: true
+    };
+
+    function isBooleanAttribute(node, attrName) {
+      return BOOLEAN_ATTRS[attrName] && BOOLEAN_ELEMENTS[node.nodeName];
+    }
+
     // 找指令
     function collectDirectives(node, attrs) {
       var directives = [];
@@ -140,6 +164,9 @@ function $CompileProvider($provide) {
           normalizedAttrName = directiveNormalize(name.toLowerCase());
           addDirective(directives, normalizedAttrName, 'A', attrStartName, attrEndName);
           attrs[normalizedAttrName] = attr.value.trim();
+          if (isBooleanAttribute(node, normalizedAttrName)) {
+            attrs[normalizedAttrName] = true;
+          }
         });
         _.forEach(node.classList, function (cls) {
           var normalizedClassName = directiveNormalize(cls);
