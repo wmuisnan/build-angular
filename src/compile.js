@@ -79,10 +79,11 @@ function $CompileProvider($provide) {
     // 编译元素： 找指令，把元素丢到指令里去
     function compileNodes($compileNodes) {
       _.forEach($compileNodes, function (node) {
+        var attrs = {};
         // 找指令
-        var directives = collectDirectives(node);
+        var directives = collectDirectives(node, attrs);
         // 把元素丢到指令里去
-        var terminal = applyDirectivesToNode(directives, node);
+        var terminal = applyDirectivesToNode(directives, node, attrs);
 
         // 如果有子级，递归找下去
         if (!terminal && node.childNodes && node.childNodes.length) {
@@ -113,7 +114,7 @@ function $CompileProvider($provide) {
     }
 
     // 找指令
-    function collectDirectives(node) {
+    function collectDirectives(node, attrs) {
       var directives = [];
       if (node.nodeType === Node.ELEMENT_NODE) {
         var normalizedNodeName = directiveNormalize(nodeName(node).toLowerCase());
@@ -138,6 +139,7 @@ function $CompileProvider($provide) {
           }
           normalizedAttrName = directiveNormalize(name.toLowerCase());
           addDirective(directives, normalizedAttrName, 'A', attrStartName, attrEndName);
+          attrs[normalizedAttrName] = attr.value.trim();
         });
         _.forEach(node.classList, function (cls) {
           var normalizedClassName = directiveNormalize(cls);
@@ -157,7 +159,7 @@ function $CompileProvider($provide) {
     }
 
     // 应用指令, 把元素丢到指令里去
-    function applyDirectivesToNode(directives, compileNode) {
+    function applyDirectivesToNode(directives, compileNode, attrs) {
       var $compileNode = $(compileNode);
       var terminalPriority = -Number.MAX_VALUE;
       var terminal = false;
@@ -169,7 +171,7 @@ function $CompileProvider($provide) {
           return false;
         }
         if (directive.compile) {
-          directive.compile($compileNode);
+          directive.compile($compileNode, attrs);
         }
         if (directive.terminal) {
           terminal = true;
